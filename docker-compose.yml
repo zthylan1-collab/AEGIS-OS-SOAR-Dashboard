@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: aegis-postgres
+    environment:
+      POSTGRES_USER: aegis
+      POSTGRES_PASSWORD: aegis123
+      POSTGRES_DB: aegis_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aegis -d aegis_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7
+    container_name: aegis-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redpanda:
+    image: docker.redpanda.com/redpandata/redpanda:v24.2.1
+    container_name: aegis-redpanda
+    command:
+      - redpanda
+      - start
+      - --kafka-addr PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr PLAINTEXT://localhost:9092
+      - --smp 1
+      - --memory 1G
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q Healthy || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  localstack:
+    image: localstack/localstack:latest
+    container_name: aegis-localstack
+    environment:
+      - SERVICES=s3,ec2,iam,cloudtrail
+      - AWS_DEFAULT_REGION=us-east-1
+    ports:
+      - "4566:4566"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:4566/_localstack/health > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+volumes:
+  postgres_data:
